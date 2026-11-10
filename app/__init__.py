@@ -1,0 +1,2 @@
+"""SeatScout application package."""
+
