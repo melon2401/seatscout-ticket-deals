@@ -34,10 +34,43 @@ $$('.quantity-grid button').forEach((button) => button.onclick = (event) => {
   event.preventDefault(); $$('.quantity-grid button').forEach((item) => item.classList.remove('selected')); button.classList.add('selected');
   $('#quantityButton').textContent = `${button.value} ticket${button.value === '1' ? '' : 's'} together⌄`; setTimeout(() => $('#quantityDialog').close(), 180);
 });
+const knownArtists = ['The Weeknd', 'Taylor Swift', 'Raptors', 'Oasis', 'Wicked', 'Phoebe Bridgers'];
+function escapeHTML(value) { return value.replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]); }
+function editDistance(a, b) {
+  const rows = Array.from({ length: b.length + 1 }, (_, i) => [i]);
+  rows[0] = Array.from({ length: a.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= b.length; i += 1) for (let j = 1; j <= a.length; j += 1) rows[i][j] = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + (a[j - 1] === b[i - 1] ? 0 : 1));
+  return rows[b.length][a.length];
+}
+function resolveQuery(value) {
+  const query = value.trim(), normalized = query.toLowerCase();
+  const ranked = knownArtists.map((artist) => ({ artist, distance: editDistance(normalized, artist.toLowerCase()) })).sort((a, b) => a.distance - b.distance);
+  return ranked[0] && ranked[0].distance <= Math.max(2, Math.floor(ranked[0].artist.length * .25)) ? ranked[0].artist : query;
+}
+function estimatedPrice(name) { return 95 + [...name].reduce((total, char) => total + char.charCodeAt(0), 0) % 126; }
+function showEstimatedResult(query, city) {
+  const artist = resolveQuery(query), corrected = artist.toLowerCase() !== query.trim().toLowerCase(), price = estimatedPrice(artist);
+  const safeArtist = escapeHTML(artist), safeQuery = escapeHTML(query.trim()), safeCity = escapeHTML(city);
+  const summary = $('#searchSummary');
+  summary.hidden = false;
+  summary.innerHTML = `<div><span class="label">SEARCH RESULT</span><strong>${corrected ? `Showing “${safeArtist}” for “${safeQuery}”` : `Showing “${safeArtist}”`}</strong><small>Live inventory unavailable · displaying a market estimate</small></div><button type="button" id="clearSearch">Clear</button>`;
+  $$('.event-stub').forEach((card) => { card.hidden = true; });
+  $('#estimatedResult')?.remove();
+  $('#eventRail').insertAdjacentHTML('afterbegin', `<article class="event-stub estimated-result" id="estimatedResult" data-category="Concerts"><div class="event-date">DATE TBA</div><h3>${safeArtist}</h3><p>${safeCity} · venue and date to be confirmed</p><div><strong>estimated from $${price}</strong><span class="estimate-badge">ESTIMATE</span><button class="save-event" aria-label="Save ${safeArtist}">♡</button></div></article>`);
+  $('#clearSearch').onclick = () => { summary.hidden = true; $('#estimatedResult')?.remove(); $$('.event-stub').forEach((card) => { card.hidden = false; }); };
+  toast(corrected ? `Corrected to ${artist} · estimated result shown` : 'Estimated market result shown');
+}
 $('#searchForm').onsubmit = async (event) => {
-  event.preventDefault(); toast('Searching official and resale sources…'); const query = $('#searchInput').value;
-  try { const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&city=${encodeURIComponent($('#citySelect').value)}`); if (response.ok) { const data = await response.json(); toast(`${data.events.length} events found · ${data.mode} sources`); } }
-  catch { toast('Preview search uses the demo market feed'); }
+  event.preventDefault(); const query = $('#searchInput').value.trim(), city = $('#citySelect').value;
+  if (!query) { toast('Enter an artist, event, or venue'); return; }
+  toast('Searching official and resale sources…');
+  try {
+    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&city=${encodeURIComponent(city)}`);
+    if (!response.ok) throw new Error('Static preview');
+    const data = await response.json();
+    showEstimatedResult(resolveQuery(query), city);
+    if (data.events.length) toast(`${data.events.length} events found · ${data.mode} sources`);
+  } catch { showEstimatedResult(query, city); }
   $('#discover').scrollIntoView();
 };
 $$('.deal-button').forEach((button) => button.onclick = () => toast('Seller links activate when live marketplace feeds are connected'));

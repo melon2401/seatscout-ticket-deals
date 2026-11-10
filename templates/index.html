@@ -33,6 +33,7 @@
 
     <section class="discover section" id="discover">
       <div class="section-heading"><div><span class="label">TRENDING</span><h2>Popular right now</h2></div><div class="tabs" role="tablist"><button class="active" data-category="All">All</button><button data-category="Sports">Sports</button><button data-category="Concerts">Concerts</button><button data-category="Theatre">Theatre</button></div></div>
+      <div class="search-summary" id="searchSummary" hidden aria-live="polite"></div>
       <div class="event-rail" id="eventRail">
         {% for event in events %}<article class="event-stub" data-category="{{ event.category }}" data-slug="{{ event.slug }}"><div class="event-date">{{ event.date }}</div><h3>{{ event.artist }}</h3><p>{{ event.city }} · {{ event.venue }}</p><div><strong>from ${{ event.low }}</strong><span class="change {{ 'down' if event.change < 0 else 'up' }}">{{ event.change }}%</span><button class="save-event" aria-label="Save {{ event.artist }}">♡</button></div></article>{% endfor %}
       </div>
