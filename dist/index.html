@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Compare official and resale tickets with fee-inclusive prices and historical context.">
+  <title>SeatScout — Ticket prices in context</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&family=Libre+Franklin:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <header class="masthead">
+    <a class="wordmark" href="#top" aria-label="SeatScout home">SeatScout</a>
+    <nav aria-label="Primary navigation">
+      <a href="#discover">Events</a><a href="#market">Compare</a><a href="#history">Price history</a>
+      <button class="nav-pill" id="savedButton">♡ Saved <b id="savedCount">0</b></button>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero frame">
+      <div class="hero-copy"><span class="burst">✦</span><p class="edition">PRICE DESK · TORONTO EDITION</p><h1>Find the best ticket.<br><em>Skip the fee surprise.</em></h1><p>Compare live-event prices, understand the market, and choose the right moment to buy.</p></div>
+      <div class="marquee" aria-hidden="true"><span>BOX</span><span>OFFICE</span><i>★</i></div>
+      <form class="search-console" id="searchForm">
+        <label><span>EVENT, ARTIST, OR VENUE</span><input id="searchInput" name="q" placeholder="The Weeknd, Raptors, Rogers Centre" value="The Weeknd"></label>
+        <label><span>CITY</span><select id="citySelect" name="city"><option>Toronto</option><option>New York</option><option>Los Angeles</option><option>Chicago</option></select></label>
+        <label><span>DATE</span><select><option>All dates</option><option>This week</option><option>This month</option></select></label>
+        <button type="submit">Search tickets →</button>
+      </form>
+    </section>
+
+    <section class="discover section" id="discover">
+      <div class="section-heading"><div><span class="label">TRENDING</span><h2>Popular right now</h2></div><div class="tabs" role="tablist"><button class="active" data-category="All">All</button><button data-category="Sports">Sports</button><button data-category="Concerts">Concerts</button><button data-category="Theatre">Theatre</button></div></div>
+      <div class="event-rail" id="eventRail">
+        <article class="event-stub" data-category="Concerts" data-slug="the-weeknd-toronto"><div class="event-date">Mar 21</div><h3>The Weeknd</h3><p>Toronto · Rogers Centre</p><div><strong>from $224</strong><span class="change down">-8%</span><button class="save-event" aria-label="Save The Weeknd">♡</button></div></article><article class="event-stub" data-category="Concerts" data-slug="taylor-swift-toronto"><div class="event-date">Nov 14</div><h3>Taylor Swift</h3><p>Toronto · Rogers Centre</p><div><strong>from $412</strong><span class="change down">-5%</span><button class="save-event" aria-label="Save Taylor Swift">♡</button></div></article><article class="event-stub" data-category="Sports" data-slug="raptors-celtics"><div class="event-date">Dec 04</div><h3>Raptors vs. Celtics</h3><p>Toronto · Scotiabank Arena</p><div><strong>from $96</strong><span class="change up">3%</span><button class="save-event" aria-label="Save Raptors vs. Celtics">♡</button></div></article><article class="event-stub" data-category="Concerts" data-slug="oasis-toronto"><div class="event-date">Aug 24</div><h3>Oasis</h3><p>Toronto · Rogers Stadium</p><div><strong>from $189</strong><span class="change down">-12%</span><button class="save-event" aria-label="Save Oasis">♡</button></div></article><article class="event-stub" data-category="Theatre" data-slug="wicked-toronto"><div class="event-date">Jan 17</div><h3>Wicked</h3><p>Toronto · Princess of Wales Theatre</p><div><strong>from $88</strong><span class="change down">-2%</span><button class="save-event" aria-label="Save Wicked">♡</button></div></article>
+      </div>
+    </section>
+
+    <section class="market frame" id="market">
+      <header class="event-header"><div><span class="label light">LIVE MARKET BOARD</span><h2>The Weeknd — Toronto</h2></div><div class="event-meta"><b>After Hours Til Dawn Tour</b><span>Rogers Centre · Mar 21 · 8:00 PM</span></div><button class="alert-btn">＋ Watch price</button></header>
+
+      <div class="market-layout">
+        <aside class="map-panel">
+          <div class="panel-title"><h3>Venue zones</h3><span>Prices from</span></div>
+          <div class="venue-map" aria-label="Interactive venue zones">
+            <button class="ring ring-4 zone-trigger" data-zone="200 Level" data-price="224" data-count="38" aria-label="200 Level, tickets from $224"><span>$224</span></button>
+            <button class="ring ring-3 zone-trigger" data-zone="100 Level" data-price="276" data-count="24" aria-label="100 Level, tickets from $276"><span>$276</span></button>
+            <button class="ring ring-2 zone-trigger" data-zone="Floor" data-price="612" data-count="11" aria-label="Floor, tickets from $612"><span>$612</span></button>
+            <div class="stage">STAGE</div>
+            <div class="zone-tooltip" id="zoneTooltip" role="status"><small>HOVER A ZONE</small><strong>Explore prices</strong><span>Click for detailed trends and listings</span></div>
+          </div>
+          <p class="map-help">Hover to preview · click a zone for detailed pricing</p>
+          <div class="zone-list"><button class="zone-row zone-trigger" data-zone="Floor" data-price="612" data-count="11"><i style="--zone:#c99a2d"></i><span>Floor</span><b>$612+</b><em>→</em></button><button class="zone-row zone-trigger" data-zone="100 Level" data-price="276" data-count="24"><i style="--zone:#8f1f25"></i><span>100 Level</span><b>$276+</b><em>→</em></button><button class="zone-row zone-trigger" data-zone="200 Level" data-price="224" data-count="38"><i style="--zone:#6f7645"></i><span>200 Level</span><b>$224+</b><em>→</em></button><button class="zone-row zone-trigger" data-zone="Accessible" data-price="289" data-count="6"><i style="--zone:#477c76"></i><span>Accessible</span><b>$289+</b><em>→</em></button></div>
+        </aside>
+
+        <div class="intelligence">
+          <section class="chart-card" id="history">
+            <div class="panel-title"><div><span class="label">MARKET INTELLIGENCE</span><h3>Price history</h3></div><div class="range-tabs"><button data-range="7">7D</button><button class="active" data-range="30">30D</button><button data-range="90">90D</button><button data-range="180">6M</button></div></div>
+            <div class="chart-wrap"><div class="chart-canvas"><svg id="priceChart" viewBox="0 0 760 260" role="img" aria-label="Interactive ticket price history chart"></svg><div id="chartTooltip" class="chart-tooltip" role="status"></div></div><div class="chart-legend"><button data-series="low"><i class="low"></i>Low <b>$224</b></button><button data-series="median"><i class="median"></i>Median <b>$298</b></button><button data-series="official"><i class="official"></i>Official <b>$449</b></button><button data-series="resale"><i class="resale"></i>Resale <b>$276</b></button></div></div>
+            <div class="insights"><article><span>30-day change</span><strong>↓ 13.2%</strong></article><article><span>Lowest recorded</span><strong>$218</strong></article><article><span>Market signal</span><strong>Good time to buy</strong></article></div>
+          </section>
+
+          <section class="filter-bar">
+            <button id="quantityButton">2 tickets together⌄</button><button>Any section⌄</button><button>Any row⌄</button><button>Up to $500⌄</button><label><input type="checkbox" id="accessibleOnly"> Accessible only</label>
+          </section>
+
+          <section class="seller-strip"><div><span>MARKETPLACES CHECKED</span><b>5 sources · updated now</b></div><ol><li><span>SeatGeek</span><b>$276</b></li><li><span>StubHub</span><b>$281</b></li><li><span>Vivid Seats</span><b>$289</b></li><li><span>Ticketmaster</span><b>$449</b></li></ol></section>
+
+          <div class="ticket-toolbar"><div><b><span id="offerCount">5</span> listings</b><span>Prices include estimated fees</span></div><div class="sort-tabs"><button class="active" data-sort="score">Best score</button><button data-sort="price">Lowest price</button></div></div>
+          <div class="tickets" id="ticketList">
+            <article class="ticket" data-id="sg-118-h" data-price="276" data-score="9.8" data-kind="resale">
+              <div class="ticket-serial">NO. 00046120046120763804612017</div>
+              <div class="ticket-main"><div class="seller-line"><h3>SeatGeek</h3><span class="stamp">BEST DEAL</span></div><div class="seat-grid"><span>SECTION<b>118</b></span><span>ROW<b>H</b></span><span>QUANTITY<b>2 or 4</b></span><span>DELIVERY<b>Instant delivery</b></span></div><div class="score"><b>9.8</b><span>Excellent</span><small>Compared with similar sections and rows</small></div></div>
+              <div class="ticket-stub"><button class="save-offer" aria-label="Save deal">♡</button><span>ALL-IN PRICE</span><strong>$276</strong><small>each · $254 + $22 fees</small><button class="deal-button">View deal →</button></div>
+            </article><article class="ticket" data-id="sh-121-k" data-price="281" data-score="9.2" data-kind="resale">
+              <div class="ticket-serial">NO. 00461201988</div>
+              <div class="ticket-main"><div class="seller-line"><h3>StubHub</h3><span class="stamp">PRICE DROP</span></div><div class="seat-grid"><span>SECTION<b>121</b></span><span>ROW<b>K</b></span><span>QUANTITY<b>2</b></span><span>DELIVERY<b>Mobile transfer</b></span></div><div class="score"><b>9.2</b><span>Excellent</span><small>Compared with similar sections and rows</small></div></div>
+              <div class="ticket-stub"><button class="save-offer" aria-label="Save deal">♡</button><span>ALL-IN PRICE</span><strong>$281</strong><small>each · $263 + $18 fees</small><button class="deal-button">View deal →</button></div>
+            </article><article class="ticket" data-id="vs-124-j" data-price="289" data-score="8.9" data-kind="resale">
+              <div class="ticket-serial">NO. 0046120046120763</div>
+              <div class="ticket-main"><div class="seller-line"><h3>Vivid Seats</h3><span class="stamp">LOWEST IN SECTION</span></div><div class="seat-grid"><span>SECTION<b>124</b></span><span>ROW<b>J</b></span><span>QUANTITY<b>1–4</b></span><span>DELIVERY<b>Mobile transfer</b></span></div><div class="score"><b>8.9</b><span>Great</span><small>Compared with similar sections and rows</small></div></div>
+              <div class="ticket-stub"><button class="save-offer" aria-label="Save deal">♡</button><span>ALL-IN PRICE</span><strong>$289</strong><small>each · $265 + $24 fees</small><button class="deal-button">View deal →</button></div>
+            </article><article class="ticket" data-id="tm-121-k" data-price="449" data-score="7.1" data-kind="official">
+              <div class="ticket-serial">NO. 046120</div>
+              <div class="ticket-main"><div class="seller-line"><h3>Ticketmaster</h3><span class="stamp">OFFICIAL</span></div><div class="seat-grid"><span>SECTION<b>121</b></span><span>ROW<b>K</b></span><span>QUANTITY<b>2</b></span><span>DELIVERY<b>Official mobile ticket</b></span></div><div class="score"><b>7.1</b><span>Fair</span><small>Compared with similar sections and rows</small></div></div>
+              <div class="ticket-stub"><button class="save-offer" aria-label="Save deal">♡</button><span>ALL-IN PRICE</span><strong>$449</strong><small>each · $409 + $40 fees</small><button class="deal-button">View deal →</button></div>
+            </article><article class="ticket" data-id="gt-130-m" data-price="310" data-score="8.2" data-kind="resale">
+              <div class="ticket-serial">NO. 048811</div>
+              <div class="ticket-main"><div class="seller-line"><h3>GameTime</h3><span class="stamp">GOOD VIEW</span></div><div class="seat-grid"><span>SECTION<b>130</b></span><span>ROW<b>M</b></span><span>QUANTITY<b>2–6</b></span><span>DELIVERY<b>Instant delivery</b></span></div><div class="score"><b>8.2</b><span>Great</span><small>Compared with similar sections and rows</small></div></div>
+              <div class="ticket-stub"><button class="save-offer" aria-label="Save deal">♡</button><span>ALL-IN PRICE</span><strong>$310</strong><small>each · $281 + $29 fees</small><button class="deal-button">View deal →</button></div>
+            </article>
+          </div>
+        </div>
+      </div>
+      <section class="zone-details" id="zone-details" tabindex="-1" hidden>
+        <header><div><span class="label light">ZONE PRICE DESK</span><h2 id="zoneDetailTitle">200 Level</h2><p id="zoneDetailSummary">38 matching listings from $224, including estimated fees.</p></div><button id="closeZoneDetails">Close ×</button></header>
+        <div class="zone-detail-grid">
+          <article><span>Current low</span><strong id="zoneCurrentLow">$224</strong><small>all-in estimate</small></article>
+          <article><span>Typical price</span><strong id="zoneMedian">$298</strong><small>median in this zone</small></article>
+          <article><span>30-day movement</span><strong id="zoneMovement">↓ 13.2%</strong><small>based on stored snapshots</small></article>
+          <article><span>Available listings</span><strong id="zoneListingCount">38</strong><small>across checked sellers</small></article>
+        </div>
+        <div class="zone-deep-dive"><div><h3>Price range by row</h3><div class="row-bars" id="zoneRowBars"></div></div><div><h3>Best matching tickets</h3><div class="zone-matches" id="zoneMatches"></div></div></div>
+      </section>
+    </section>
+
+    <section class="saved-drawer" id="savedDrawer" aria-live="polite"><div><span class="label light">YOUR TICKET DRAWER</span><h2>Saved deals</h2><p>Stored on this device—no account needed.</p></div><div id="savedItems" class="saved-items"><p class="empty">Punch the heart on a ticket to save it here.</p></div><button id="closeDrawer">Close</button></section>
+  </main>
+
+  <dialog id="quantityDialog"><form method="dialog"><button class="dialog-close" value="cancel">×</button><span class="label">SEATS TOGETHER</span><h2>How many tickets?</h2><p>We’ll only show listings with enough adjacent seats.</p><div class="quantity-grid"><button value="1">1</button><button value="2" class="selected">2</button><button value="3">3</button><button value="4">4</button><button value="5">5</button><button value="6+">6+</button></div><label class="accessible"><input type="checkbox"> Wheelchair-accessible tickets only</label><small>Displayed prices include estimated fees. Taxes may vary at checkout.</small></form></dialog>
+  <div class="toast" id="toast"></div>
+  <script>window.SEATSCOUT_HISTORY={"labels": ["Oct 12", "Oct 16", "Oct 20", "Oct 24", "Oct 28", "Nov 1", "Nov 5", "Today"], "low": [258, 246, 251, 238, 231, 236, 228, 224], "median": [338, 329, 318, 311, 305, 301, 296, 298], "official": [470, 470, 462, 459, 449, 449, 449, 449], "resale": [391, 372, 378, 349, 318, 305, 284, 276]};</script>
+  <script src="./app.js"></script>
+</body>
+</html>
