@@ -51,6 +51,44 @@ function resolveQuery(value) {
   return ranked[0] && ranked[0].distance <= Math.max(2, Math.floor(ranked[0].label.length * .28)) ? ranked[0].label : query;
 }
 function estimatedPrice(name) { return 95 + [...name].reduce((total, char) => total + char.charCodeAt(0), 0) % 126; }
+function marketFromCard(card) {
+  return { artist:card.dataset.artist, city:card.dataset.city, venue:card.dataset.venue, date:card.dataset.date, low:+card.dataset.low, change:+card.dataset.change || -5, estimated:card.id === 'estimatedResult' };
+}
+function generatedHistory(low, change) {
+  const factor = 1 + Math.abs(change) / 100, steps = [1.12,1.09,1.1,1.06,1.04,1.05,1.02,1];
+  const series = (multiple) => steps.map((step) => Math.round(low * multiple * step * factor / factor));
+  return { labels:['Oct 12','Oct 16','Oct 20','Oct 24','Oct 28','Nov 1','Nov 5','Today'], low:series(1), median:series(1.28), official:series(1.72), resale:series(1.14) };
+}
+function setActiveMarket(eventData, scroll = false) {
+  const { artist, city, venue, date, low, change, estimated } = eventData;
+  $$('.event-stub').forEach((card) => card.classList.toggle('active-market', card.dataset.artist === artist));
+  $('#marketModeLabel').textContent = estimated ? 'ESTIMATED MARKET PREVIEW' : 'MARKET BOARD';
+  $('#marketEventTitle').textContent = `${artist} — ${city}`;
+  $('#marketEventSubtitle').textContent = estimated ? 'Projected ticket market' : `${artist} ticket market`;
+  $('#marketEventMeta').textContent = `${venue} · ${date}${estimated ? '' : ' · local time TBA'}`;
+  window.SEATSCOUT_HISTORY = generatedHistory(low, change);
+  const current = Object.fromEntries(['low','median','official','resale'].map((key) => [key, window.SEATSCOUT_HISTORY[key].at(-1)]));
+  $$('.chart-legend button').forEach((button) => { button.querySelector('b').textContent = `$${current[button.dataset.series]}`; });
+  $('#marketChange').textContent = `${change <= 0 ? '↓' : '↑'} ${Math.abs(change).toFixed(1)}%`;
+  $('#marketLowest').textContent = `$${Math.max(1, Math.round(low * .96))}`;
+  $('#marketSignal').textContent = change < -6 ? 'Good time to buy' : change > 2 ? 'Prices are rising' : 'Market is steady';
+
+  const zonePrices = { '200 Level':low, '100 Level':Math.round(low * 1.23), Floor:Math.round(low * 2.35), Accessible:Math.round(low * 1.29) };
+  Object.entries(zonePrices).forEach(([name, price]) => {
+    const data = zoneData[name]; data.price = price; data.median = Math.round(price * 1.22); data.movement = `${change <= 0 ? '↓' : '↑'} ${Math.abs(change).toFixed(1)}%`; data.rows = data.rows.map(([row], index) => [row, Math.round(price * (1 + index * .09))]);
+    $$(`.zone-trigger[data-zone="${name}"]`).forEach((trigger) => { trigger.dataset.price = price; trigger.setAttribute('aria-label', `${name}, tickets from $${price}`); trigger.querySelector('span') ? trigger.querySelector('span').textContent = `$${price}` : null; const bold = trigger.querySelector('b'); if (bold) bold.textContent = `$${price}+`; });
+  });
+
+  const sellerMultipliers = [1.14,1.18,1.22,1.72,1.3];
+  $$('.ticket').forEach((ticket, index) => {
+    const total = Math.round(low * sellerMultipliers[index]), fees = Math.max(12, Math.round(total * .08)), base = total - fees;
+    ticket.dataset.price = total; ticket.querySelector('.ticket-stub strong').textContent = `$${total}`; ticket.querySelector('.ticket-stub small').textContent = `each · $${base} + $${fees} fees`;
+  });
+  $$('.seller-strip ol li b').forEach((price, index) => { price.textContent = `$${Math.round(low * sellerMultipliers[index])}`; });
+  $('#zone-details').hidden = true;
+  drawChart(+$('.range-tabs .active').dataset.range);
+  if (scroll) $('#market').scrollIntoView({behavior:'smooth',block:'start'});
+}
 function showCatalogResults(query) {
   const resolved = resolveQuery(query), needle = resolved.toLowerCase();
   const cards = $$('.event-stub:not(#estimatedResult)'), matches = cards.filter((card) => card.textContent.toLowerCase().includes(needle));
@@ -61,6 +99,7 @@ function showCatalogResults(query) {
   summary.hidden = false;
   summary.innerHTML = `<div><span class="label">SEARCH RESULT</span><strong>${corrected ? `Showing “${escapeHTML(resolved)}” for “${escapeHTML(query.trim())}”` : `${matches.length} matching event${matches.length === 1 ? '' : 's'}`}</strong><small>Matched across artists, events, teams, cities, and venues</small></div><button type="button" id="clearSearch">Clear</button>`;
   $('#clearSearch').onclick = clearSearchResults;
+  setActiveMarket(marketFromCard(matches[0]));
   toast(corrected ? `Corrected to ${resolved}` : `${matches.length} matching event${matches.length === 1 ? '' : 's'}`);
   return true;
 }
@@ -73,7 +112,8 @@ function showEstimatedResult(query, city) {
   summary.innerHTML = `<div><span class="label">SEARCH RESULT</span><strong>${corrected ? `Showing “${safeArtist}” for “${safeQuery}”` : `Showing “${safeArtist}”`}</strong><small>Live inventory unavailable · displaying a market estimate</small></div><button type="button" id="clearSearch">Clear</button>`;
   $$('.event-stub').forEach((card) => { card.hidden = true; });
   $('#estimatedResult')?.remove();
-  $('#eventRail').insertAdjacentHTML('afterbegin', `<article class="event-stub estimated-result" id="estimatedResult" data-category="Concerts"><div class="event-date">DATE TBA</div><h3>${safeArtist}</h3><p>${safeCity} · venue and date to be confirmed</p><div><strong>estimated from $${price}</strong><span class="estimate-badge">ESTIMATE</span><button class="save-event" aria-label="Save ${safeArtist}">♡</button></div></article>`);
+  $('#eventRail').insertAdjacentHTML('afterbegin', `<article class="event-stub estimated-result" id="estimatedResult" tabindex="0" role="button" data-category="Concerts" data-artist="${safeArtist}" data-city="${safeCity}" data-venue="Venue TBA" data-date="Date TBA" data-low="${price}" data-change="-5"><div class="event-date">DATE TBA</div><h3>${safeArtist}</h3><p>${safeCity} · venue and date to be confirmed</p><div><strong>estimated from $${price}</strong><span class="estimate-badge">ESTIMATE</span><button class="save-event" aria-label="Save ${safeArtist}">♡</button></div></article>`);
+  setActiveMarket(marketFromCard($('#estimatedResult')));
   $('#clearSearch').onclick = clearSearchResults;
   toast(corrected ? `Corrected to ${artist} · estimated result shown` : 'Estimated market result shown');
 }
@@ -96,12 +136,14 @@ $('.alert-btn').onclick = () => toast('Price watch saved on this device');
 function drawChart(range = 30) {
   const svg = $('#priceChart'), data = window.SEATSCOUT_HISTORY;
   if (!svg || !data || !Array.isArray(data.labels)) return;
-  const W = 760, H = 260, padding = { l: 48, r: 18, t: 18, b: 34 }, min = 180, max = 500;
+  const W = 760, H = 260, padding = { l: 48, r: 18, t: 18, b: 34 };
   const count = range === 7 ? 4 : data.labels.length, start = Math.max(0, data.labels.length - count), labels = data.labels.slice(start);
+  const visibleValues = ['low','median','official','resale'].filter((key) => !hiddenSeries.has(key)).flatMap((key) => data[key].slice(start));
+  const rawMin = Math.min(...visibleValues), rawMax = Math.max(...visibleValues), spread = Math.max(40, rawMax - rawMin), min = Math.max(0, Math.floor((rawMin - spread * .12) / 10) * 10), max = Math.ceil((rawMax + spread * .12) / 10) * 10;
   const x = (index) => padding.l + index * (W - padding.l - padding.r) / Math.max(1, labels.length - 1);
   const y = (value) => padding.t + (max - value) * (H - padding.t - padding.b) / (max - min);
   let markup = '';
-  [200,250,300,350,400,450,500].forEach((value) => { markup += `<line x1="${padding.l}" y1="${y(value)}" x2="${W-padding.r}" y2="${y(value)}" stroke="rgba(28,33,27,.16)"/><text x="4" y="${y(value)+4}" font-size="10" font-family="DM Mono">$${value}</text>`; });
+  Array.from({length:7}, (_, index) => Math.round((min + (max-min) * index / 6) / 10) * 10).forEach((value) => { markup += `<line x1="${padding.l}" y1="${y(value)}" x2="${W-padding.r}" y2="${y(value)}" stroke="rgba(28,33,27,.16)"/><text x="4" y="${y(value)+4}" font-size="10" font-family="DM Mono">$${value}</text>`; });
   labels.forEach((label, index) => { markup += `<text x="${x(index)}" y="${H-8}" text-anchor="middle" font-size="9" font-family="DM Mono">${label}</text>`; });
   [['low','#e0a82e','4 5'],['median','#6f7645',''],['official','#8f1f25','8 5'],['resale','#67151a','']].forEach(([key,color,dash]) => {
     if (hiddenSeries.has(key)) return;
@@ -140,6 +182,15 @@ function openZoneDetails(zone) {
 }
 $$('.zone-trigger').forEach((trigger) => { trigger.addEventListener('mouseenter', () => previewZone(trigger)); trigger.addEventListener('focus', () => previewZone(trigger)); trigger.addEventListener('mouseleave', clearZonePreview); trigger.addEventListener('blur', clearZonePreview); trigger.addEventListener('click', () => openZoneDetails(trigger.dataset.zone)); });
 $('#closeZoneDetails').onclick = () => { $('#zone-details').hidden = true; history.replaceState(null,'','#market'); $('.venue-map').scrollIntoView({behavior:'smooth',block:'center'}); };
+
+$('#eventRail').addEventListener('click', (event) => {
+  if (event.target.closest('button')) return;
+  const card = event.target.closest('.event-stub'); if (card) setActiveMarket(marketFromCard(card), true);
+});
+$('#eventRail').addEventListener('keydown', (event) => {
+  if (!['Enter',' '].includes(event.key) || event.target.closest('button')) return;
+  const card = event.target.closest('.event-stub'); if (card) { event.preventDefault(); setActiveMarket(marketFromCard(card), true); }
+});
 
 drawChart();
 renderSaved();
