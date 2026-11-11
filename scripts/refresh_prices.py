@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 from app.providers import SeatGeekProvider, TicketmasterProvider
 from app.storage import init_db, save_event_snapshots
