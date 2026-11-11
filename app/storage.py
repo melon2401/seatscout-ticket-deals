@@ -7,6 +7,8 @@ from sqlalchemy import DateTime, Float, Integer, MetaData, String, Table, Column
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./seatscout.db")
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
