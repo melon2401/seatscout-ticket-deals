@@ -24,6 +24,12 @@ class SeatScoutTests(unittest.TestCase):
         names = {provider["name"] for provider in payload["providers"]}
         self.assertGreaterEqual(names, {"Ticketmaster", "SeatGeek"})
 
+    def test_search_tolerates_artist_and_venue_typos(self):
+        artist_results = self.client.get("/api/search", params={"q": "Talyor Swift"}).json()["events"]
+        venue_results = self.client.get("/api/search", params={"q": "Rogers Centar"}).json()["events"]
+        self.assertEqual(artist_results[0]["artist"], "Taylor Swift")
+        self.assertTrue(any(event["venue"] == "Rogers Centre" for event in venue_results))
+
 
 if __name__ == "__main__":
     unittest.main()

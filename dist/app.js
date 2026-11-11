@@ -34,7 +34,10 @@ $$('.quantity-grid button').forEach((button) => button.onclick = (event) => {
   event.preventDefault(); $$('.quantity-grid button').forEach((item) => item.classList.remove('selected')); button.classList.add('selected');
   $('#quantityButton').textContent = `${button.value} ticket${button.value === '1' ? '' : 's'} together⌄`; setTimeout(() => $('#quantityDialog').close(), 180);
 });
-const knownArtists = ['The Weeknd', 'Taylor Swift', 'Raptors', 'Oasis', 'Wicked', 'Phoebe Bridgers'];
+const searchCatalog = [
+  'The Weeknd', 'Taylor Swift', 'Raptors vs. Celtics', 'Oasis', 'Wicked', 'Phoebe Bridgers',
+  'Rogers Centre', 'Scotiabank Arena', 'Rogers Stadium', 'Princess of Wales Theatre',
+];
 function escapeHTML(value) { return value.replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]); }
 function editDistance(a, b) {
   const rows = Array.from({ length: b.length + 1 }, (_, i) => [i]);
@@ -44,10 +47,24 @@ function editDistance(a, b) {
 }
 function resolveQuery(value) {
   const query = value.trim(), normalized = query.toLowerCase();
-  const ranked = knownArtists.map((artist) => ({ artist, distance: editDistance(normalized, artist.toLowerCase()) })).sort((a, b) => a.distance - b.distance);
-  return ranked[0] && ranked[0].distance <= Math.max(2, Math.floor(ranked[0].artist.length * .25)) ? ranked[0].artist : query;
+  const ranked = searchCatalog.map((label) => ({ label, distance: editDistance(normalized, label.toLowerCase()) })).sort((a, b) => a.distance - b.distance);
+  return ranked[0] && ranked[0].distance <= Math.max(2, Math.floor(ranked[0].label.length * .28)) ? ranked[0].label : query;
 }
 function estimatedPrice(name) { return 95 + [...name].reduce((total, char) => total + char.charCodeAt(0), 0) % 126; }
+function showCatalogResults(query) {
+  const resolved = resolveQuery(query), needle = resolved.toLowerCase();
+  const cards = $$('.event-stub:not(#estimatedResult)'), matches = cards.filter((card) => card.textContent.toLowerCase().includes(needle));
+  if (!matches.length) return false;
+  $('#estimatedResult')?.remove();
+  cards.forEach((card) => { card.hidden = !matches.includes(card); });
+  const corrected = resolved.toLowerCase() !== query.trim().toLowerCase(), summary = $('#searchSummary');
+  summary.hidden = false;
+  summary.innerHTML = `<div><span class="label">SEARCH RESULT</span><strong>${corrected ? `Showing “${escapeHTML(resolved)}” for “${escapeHTML(query.trim())}”` : `${matches.length} matching event${matches.length === 1 ? '' : 's'}`}</strong><small>Matched across artists, events, teams, cities, and venues</small></div><button type="button" id="clearSearch">Clear</button>`;
+  $('#clearSearch').onclick = clearSearchResults;
+  toast(corrected ? `Corrected to ${resolved}` : `${matches.length} matching event${matches.length === 1 ? '' : 's'}`);
+  return true;
+}
+function clearSearchResults() { $('#searchSummary').hidden = true; $('#estimatedResult')?.remove(); $$('.event-stub').forEach((card) => { card.hidden = false; }); }
 function showEstimatedResult(query, city) {
   const artist = resolveQuery(query), corrected = artist.toLowerCase() !== query.trim().toLowerCase(), price = estimatedPrice(artist);
   const safeArtist = escapeHTML(artist), safeQuery = escapeHTML(query.trim()), safeCity = escapeHTML(city);
@@ -57,7 +74,7 @@ function showEstimatedResult(query, city) {
   $$('.event-stub').forEach((card) => { card.hidden = true; });
   $('#estimatedResult')?.remove();
   $('#eventRail').insertAdjacentHTML('afterbegin', `<article class="event-stub estimated-result" id="estimatedResult" data-category="Concerts"><div class="event-date">DATE TBA</div><h3>${safeArtist}</h3><p>${safeCity} · venue and date to be confirmed</p><div><strong>estimated from $${price}</strong><span class="estimate-badge">ESTIMATE</span><button class="save-event" aria-label="Save ${safeArtist}">♡</button></div></article>`);
-  $('#clearSearch').onclick = () => { summary.hidden = true; $('#estimatedResult')?.remove(); $$('.event-stub').forEach((card) => { card.hidden = false; }); };
+  $('#clearSearch').onclick = clearSearchResults;
   toast(corrected ? `Corrected to ${artist} · estimated result shown` : 'Estimated market result shown');
 }
 $('#searchForm').onsubmit = async (event) => {
@@ -68,9 +85,9 @@ $('#searchForm').onsubmit = async (event) => {
     const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&city=${encodeURIComponent(city)}`);
     if (!response.ok) throw new Error('Static preview');
     const data = await response.json();
-    showEstimatedResult(resolveQuery(query), city);
-    if (data.events.length) toast(`${data.events.length} events found · ${data.mode} sources`);
-  } catch { showEstimatedResult(query, city); }
+    if (!showCatalogResults(query)) showEstimatedResult(resolveQuery(query), city);
+    if (data.events.length && data.mode === 'live') toast(`${data.events.length} live events found`);
+  } catch { if (!showCatalogResults(query)) showEstimatedResult(query, city); }
   $('#discover').scrollIntoView();
 };
 $$('.deal-button').forEach((button) => button.onclick = () => toast('Seller links activate when live marketplace feeds are connected'));

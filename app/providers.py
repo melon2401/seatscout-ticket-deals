@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 
 import httpx
 
@@ -23,7 +24,18 @@ class DemoProvider:
         needle = query.casefold().strip()
         if not needle:
             return EVENTS
-        return [event for event in EVENTS if needle in " ".join(event.values() if False else [event["artist"], event["city"], event["venue"]]).casefold()]
+        indexed = [
+            (event, " ".join([event["artist"], event["city"], event["venue"], event["category"]]).casefold())
+            for event in EVENTS
+        ]
+        direct = [event for event, haystack in indexed if needle in haystack]
+        if direct:
+            return direct
+        scored = [
+            (max(SequenceMatcher(None, needle, term.casefold()).ratio() for term in [event["artist"], event["venue"], event["city"]]), event)
+            for event, _ in indexed
+        ]
+        return [event for score, event in sorted(scored, key=lambda item: item[0], reverse=True) if score >= 0.62]
 
     async def offers(self, _event_slug: str) -> list[dict]:
         return OFFERS
