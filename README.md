@@ -26,7 +26,15 @@ Set `TRACKED_SEARCHES` to a comma-separated list, then run:
 .venv/bin/python scripts/refresh_prices.py
 ```
 
-The included `render.yaml` defines a Python API, PostgreSQL database, and hourly snapshot job. Ticketmaster and SeatGeek credentials are requested securely by Render during Blueprint setup and are never stored in Git.
+The included `render.yaml` defines a free Python API service. Use a free Neon PostgreSQL database for durable history; unlike Render's free database, Neon does not expire after 30 days. The GitHub Actions workflow in `.github/workflows/refresh-prices.yml` runs the collector hourly at no cost for this public repository.
+
+Add these encrypted secrets in **GitHub → Repository settings → Secrets and variables → Actions**:
+
+- `DATABASE_URL`
+- `TICKETMASTER_API_KEY`
+- `SEATGEEK_CLIENT_ID`
+
+Add the same three values in Render's Blueprint setup. Never put their values in source files or commits.
 
 After the API is deployed, build the static frontend with its public URL:
 

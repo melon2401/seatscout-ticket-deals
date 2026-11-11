@@ -10,9 +10,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.13.1
       - key: DATABASE_URL
-        fromDatabase:
-          name: seatscout-db
-          property: connectionString
+        sync: false
       - key: TICKETMASTER_API_KEY
         sync: false
       - key: SEATGEEK_CLIENT_ID
@@ -21,25 +19,3 @@ services:
         value: https://seatscout-ticket-deals.jest-asking.chatgpt.site
       - key: TRACKED_SEARCHES
         value: The Weeknd,Taylor Swift,Raptors,Oasis,Wicked
-
-  - type: cron
-    name: seatscout-hourly-prices
-    runtime: python
-    schedule: "0 * * * *"
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/refresh_prices.py
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: seatscout-db
-          property: connectionString
-      - key: TICKETMASTER_API_KEY
-        sync: false
-      - key: SEATGEEK_CLIENT_ID
-        sync: false
-      - key: TRACKED_SEARCHES
-        value: The Weeknd,Taylor Swift,Raptors,Oasis,Wicked
-
-databases:
-  - name: seatscout-db
-    plan: free
