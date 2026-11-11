@@ -16,6 +16,24 @@ Open `http://127.0.0.1:8000`.
 
 Copy `.env.example` to `.env` and add supported keys. Without keys, the app transparently uses the built-in demonstration feed. Ticketmaster and SeatGeek adapters are implemented; StubHub and Ticket Evolution are represented as planned partner feeds.
 
+Live results are normalized as `live_official` (Ticketmaster), `live_resale` (SeatGeek), or `estimated`. Searches with live prices are saved to the configured database. `GET /api/history/{event_key}` returns stored observations for price-history charts.
+
+## Hourly price snapshots
+
+Set `TRACKED_SEARCHES` to a comma-separated list, then run:
+
+```bash
+.venv/bin/python scripts/refresh_prices.py
+```
+
+The included `render.yaml` defines a Python API, PostgreSQL database, and hourly snapshot job. Ticketmaster and SeatGeek credentials are requested securely by Render during Blueprint setup and are never stored in Git.
+
+After the API is deployed, build the static frontend with its public URL:
+
+```bash
+PUBLIC_API_BASE_URL=https://your-api.example.com .venv/bin/python scripts/build_static.py
+```
+
 ## Static hosted build
 
 ```bash

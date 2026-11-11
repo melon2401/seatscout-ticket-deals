@@ -3,6 +3,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.storage import get_price_history, save_event_snapshots
 
 
 class SeatScoutTests(unittest.TestCase):
@@ -29,6 +30,19 @@ class SeatScoutTests(unittest.TestCase):
         venue_results = self.client.get("/api/search", params={"q": "Rogers Centar"}).json()["events"]
         self.assertEqual(artist_results[0]["artist"], "Taylor Swift")
         self.assertTrue(any(event["venue"] == "Rogers Centre" for event in venue_results))
+
+    def test_live_price_snapshots_are_stored(self):
+        key = "test-live-event"
+        save_event_snapshots([{
+            "slug": key,
+            "artist": "Test Live Event",
+            "source": "Test Provider",
+            "price_type": "live_resale",
+            "low": 123,
+        }])
+        history = get_price_history(key)
+        self.assertEqual(history[-1]["price"], 123)
+        self.assertEqual(history[-1]["price_type"], "live_resale")
 
 
 if __name__ == "__main__":

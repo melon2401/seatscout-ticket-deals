@@ -1,22 +1,28 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 
 from .data import EVENTS, OFFERS, PRICE_HISTORY, ZONES
 from .providers import DemoProvider, SeatGeekProvider, TicketmasterProvider, provider_statuses
+from .storage import get_price_history, init_db, save_event_snapshots
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
 app = FastAPI(title="SeatScout", version="0.2.0")
+allowed_origins = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "http://127.0.0.1:8000").split(",") if origin.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 templates = Jinja2Templates(directory=ROOT / "templates")
+init_db()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -26,6 +32,7 @@ async def home(request: Request):
         "offers": OFFERS,
         "history": PRICE_HISTORY,
         "zones": ZONES,
+        "api_base": os.getenv("PUBLIC_API_BASE_URL", ""),
     })
 
 
@@ -53,7 +60,17 @@ async def search(q: str = Query("", max_length=120), city: str | None = None):
                 live_results.extend(await provider.search(q))
         except Exception:
             continue
-    return {"events": live_results or results, "mode": "live" if live_results else "demo"}
+    if live_results:
+        save_event_snapshots(live_results)
+        return {"events": live_results, "mode": "live"}
+    estimated_results = [{**event, "source": "SeatScout estimate", "price_type": "estimated"} for event in results]
+    return {"events": estimated_results, "mode": "demo"}
+
+
+@app.get("/api/history/{event_key}")
+async def price_history(event_key: str):
+    snapshots = get_price_history(event_key)
+    return {"event_key": event_key, "snapshots": snapshots, "count": len(snapshots)}
 
 
 @app.get("/api/events/{event_slug}")

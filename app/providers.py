@@ -65,10 +65,11 @@ class TicketmasterProvider:
             "date": event.get("dates", {}).get("start", {}).get("localDate", ""),
             "venue": event.get("_embedded", {}).get("venues", [{}])[0].get("name", ""),
             "category": "Live event",
-            "low": None,
+            "low": min((price.get("min") for price in event.get("priceRanges", []) if price.get("min") is not None), default=None),
             "change": None,
             "url": event.get("url"),
             "source": "Ticketmaster",
+            "price_type": "live_official",
         } for event in events]
 
 
@@ -95,6 +96,7 @@ class SeatGeekProvider:
             "change": None,
             "url": event.get("url"),
             "source": "SeatGeek",
+            "price_type": "live_resale",
         } for event in response.json().get("events", [])]
 
 

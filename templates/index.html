@@ -96,7 +96,7 @@
 
   <dialog id="quantityDialog"><form method="dialog"><button class="dialog-close" value="cancel">×</button><span class="label">SEATS TOGETHER</span><h2>How many tickets?</h2><p>We’ll only show listings with enough adjacent seats.</p><div class="quantity-grid"><button value="1">1</button><button value="2" class="selected">2</button><button value="3">3</button><button value="4">4</button><button value="5">5</button><button value="6+">6+</button></div><label class="accessible"><input type="checkbox"> Wheelchair-accessible tickets only</label><small>Displayed prices include estimated fees. Taxes may vary at checkout.</small></form></dialog>
   <div class="toast" id="toast"></div>
-  <script>window.SEATSCOUT_HISTORY={{ history|tojson }};</script>
+  <script>window.SEATSCOUT_HISTORY={{ history|tojson }};window.SEATSCOUT_API_BASE={{ api_base|default('')|tojson }};</script>
   <script src="{{ static_prefix|default('/static') }}/app.js"></script>
 </body>
 </html>

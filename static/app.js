@@ -103,7 +103,24 @@ function showCatalogResults(query) {
   toast(corrected ? `Corrected to ${resolved}` : `${matches.length} matching event${matches.length === 1 ? '' : 's'}`);
   return true;
 }
-function clearSearchResults() { $('#searchSummary').hidden = true; $('#estimatedResult')?.remove(); $$('.event-stub').forEach((card) => { card.hidden = false; }); }
+function showLiveResults(events, query) {
+  const priced = events.filter((event) => event.low != null);
+  if (!priced.length) return false;
+  $$('.event-stub').forEach((card) => { card.hidden = true; });
+  $$('.live-result').forEach((card) => card.remove());
+  const markup = priced.slice(0, 5).map((event) => {
+    const artist = escapeHTML(event.artist || 'Live event'), city = escapeHTML(event.city || $('#citySelect').value), venue = escapeHTML(event.venue || 'Venue TBA'), date = escapeHTML(event.date || 'Date TBA'), low = Math.round(event.low), liveType = event.price_type === 'live_official' ? 'LIVE OFFICIAL' : 'LIVE RESALE';
+    return `<article class="event-stub live-result" tabindex="0" data-category="Live event" data-artist="${artist}" data-city="${city}" data-venue="${venue}" data-date="${date}" data-low="${low}" data-change="0"><div class="event-date">${date}</div><h3>${artist}</h3><p>${city} · ${venue}</p><div><strong>from $${low}</strong><span class="estimate-badge">${liveType}</span><button class="save-event" aria-label="Save ${artist}">♡</button></div></article>`;
+  }).join('');
+  $('#eventRail').insertAdjacentHTML('afterbegin', markup);
+  const summary = $('#searchSummary'); summary.hidden = false;
+  summary.innerHTML = `<div><span class="label">LIVE SEARCH</span><strong>${priced.length} priced result${priced.length === 1 ? '' : 's'} for “${escapeHTML(query)}”</strong><small>Direct provider data · availability can change at checkout</small></div><button type="button" id="clearSearch">Clear</button>`;
+  $('#clearSearch').onclick = clearSearchResults;
+  setActiveMarket(marketFromCard($('.live-result')));
+  toast(`${priced.length} live priced result${priced.length === 1 ? '' : 's'}`);
+  return true;
+}
+function clearSearchResults() { $('#searchSummary').hidden = true; $('#estimatedResult')?.remove(); $$('.live-result').forEach((card) => card.remove()); $$('.event-stub').forEach((card) => { card.hidden = false; }); }
 function showEstimatedResult(query, city) {
   const artist = resolveQuery(query), corrected = artist.toLowerCase() !== query.trim().toLowerCase(), price = estimatedPrice(artist);
   const safeArtist = escapeHTML(artist), safeQuery = escapeHTML(query.trim()), safeCity = escapeHTML(city);
@@ -122,11 +139,12 @@ $('#searchForm').onsubmit = async (event) => {
   if (!query) { toast('Enter an artist, event, or venue'); return; }
   toast('Searching official and resale sources…');
   try {
-    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&city=${encodeURIComponent(city)}`);
+    const apiBase = (window.SEATSCOUT_API_BASE || '').replace(/\/$/, '');
+    const response = await fetch(`${apiBase}/api/search?q=${encodeURIComponent(query)}&city=${encodeURIComponent(city)}`);
     if (!response.ok) throw new Error('Static preview');
     const data = await response.json();
+    if (data.mode === 'live' && showLiveResults(data.events, query)) return;
     if (!showCatalogResults(query)) showEstimatedResult(resolveQuery(query), city);
-    if (data.events.length && data.mode === 'live') toast(`${data.events.length} live events found`);
   } catch { if (!showCatalogResults(query)) showEstimatedResult(query, city); }
   $('#discover').scrollIntoView();
 };

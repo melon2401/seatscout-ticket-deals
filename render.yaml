@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: seatscout-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: seatscout-db
+          property: connectionString
+      - key: TICKETMASTER_API_KEY
+        sync: false
+      - key: SEATGEEK_CLIENT_ID
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://seatscout-ticket-deals.jest-asking.chatgpt.site
+      - key: TRACKED_SEARCHES
+        value: The Weeknd,Taylor Swift,Raptors,Oasis,Wicked
+
+  - type: cron
+    name: seatscout-hourly-prices
+    runtime: python
+    schedule: "0 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/refresh_prices.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: seatscout-db
+          property: connectionString
+      - key: TICKETMASTER_API_KEY
+        sync: false
+      - key: SEATGEEK_CLIENT_ID
+        sync: false
+      - key: TRACKED_SEARCHES
+        value: The Weeknd,Taylor Swift,Raptors,Oasis,Wicked
+
+databases:
+  - name: seatscout-db
+    plan: free
