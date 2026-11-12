@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import DateTime, Float, Integer, MetaData, String, Table, Column, create_engine, select
 
+
+# Load .env before reading DATABASE_URL. Real environment variables still take precedence.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./seatscout.db")
 if DATABASE_URL.startswith("postgresql://"):
