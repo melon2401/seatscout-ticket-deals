@@ -1,4 +1,15 @@
+import os
+import tempfile
 import unittest
+from pathlib import Path
+
+# Isolate tests before the app is imported: use a throwaway SQLite file and
+# blank provider keys so tests never write to a real database or call live APIs.
+# load_dotenv() does not override variables that are already set.
+_TEST_DB = Path(tempfile.mkdtemp(prefix="seatscout-test-")) / "test.db"
+os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB}"
+os.environ["TICKETMASTER_API_KEY"] = ""
+os.environ["SEATGEEK_CLIENT_ID"] = ""
 
 from fastapi.testclient import TestClient
 
