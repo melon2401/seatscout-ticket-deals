@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 # Isolate tests before the app is imported: use a throwaway SQLite file and
 # blank provider keys so tests never write to a real database or call live APIs.
@@ -41,6 +42,23 @@ class SeatScoutTests(unittest.TestCase):
         venue_results = self.client.get("/api/search", params={"q": "Rogers Centar"}).json()["events"]
         self.assertEqual(artist_results[0]["artist"], "Taylor Swift")
         self.assertTrue(any(event["venue"] == "Rogers Centre" for event in venue_results))
+
+    def test_search_explains_when_live_providers_are_not_configured(self):
+        payload = self.client.get("/api/search", params={"q": "The Weeknd", "city": "Toronto"}).json()
+        self.assertEqual(payload["mode"], "estimated")
+        self.assertEqual(payload["fallback_reason"], "providers_not_configured")
+        self.assertTrue(all(source["status"] == "not_configured" for source in payload["sources"]))
+
+    def test_search_reports_provider_failure_without_exposing_details(self):
+        with patch.dict(os.environ, {"TICKETMASTER_API_KEY": "test-key"}), patch(
+            "app.main.TicketmasterProvider.search", new=AsyncMock(side_effect=RuntimeError("secret upstream detail"))
+        ):
+            payload = self.client.get("/api/search", params={"q": "Concert", "city": "Toronto"}).json()
+        self.assertEqual(payload["mode"], "estimated")
+        self.assertEqual(payload["fallback_reason"], "provider_error")
+        ticketmaster = next(source for source in payload["sources"] if source["name"] == "Ticketmaster")
+        self.assertEqual(ticketmaster, {"name": "Ticketmaster", "status": "error", "count": 0})
+        self.assertNotIn("secret upstream detail", str(payload))
 
     def test_live_price_snapshots_are_stored(self):
         key = "test-live-event"

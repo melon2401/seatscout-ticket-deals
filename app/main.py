@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -13,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .data import EVENTS, OFFERS, PRICE_HISTORY, ZONES
 from .providers import DemoProvider, SeatGeekProvider, TicketmasterProvider, provider_statuses
 from .storage import get_price_history, init_db, save_event_snapshots
+
+logger = logging.getLogger("seatscout.providers")
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
@@ -52,19 +55,35 @@ async def search(q: str = Query("", max_length=120), city: str | None = None):
     demo = DemoProvider()
     results = await demo.search(q)
     live_results: list[dict] = []
+    sources: list[dict] = []
     for provider in (TicketmasterProvider(), SeatGeekProvider()):
+        configured = bool(getattr(provider, "api_key", None) or getattr(provider, "client_id", None))
+        if not configured:
+            sources.append({"name": provider.name, "status": "not_configured", "count": 0})
+            continue
         try:
             if isinstance(provider, TicketmasterProvider):
-                live_results.extend(await provider.search(q, city))
+                provider_results = await provider.search(q, city)
             else:
-                live_results.extend(await provider.search(q))
-        except Exception:
-            continue
+                provider_results = await provider.search(q)
+            live_results.extend(provider_results)
+            sources.append({"name": provider.name, "status": "live" if provider_results else "no_match", "count": len(provider_results)})
+        except Exception as exc:
+            # httpx exceptions can include the request URL, whose query string contains
+            # provider credentials. Record only the provider and exception class.
+            logger.warning("%s search failed (%s)", provider.name, type(exc).__name__)
+            sources.append({"name": provider.name, "status": "error", "count": 0})
     if live_results:
         save_event_snapshots(live_results)
-        return {"events": live_results, "mode": "live"}
+        return {"events": live_results, "mode": "live", "sources": sources}
     estimated_results = [{**event, "source": "SeatScout estimate", "price_type": "estimated"} for event in results]
-    return {"events": estimated_results, "mode": "demo"}
+    if any(source["status"] == "error" for source in sources):
+        fallback_reason = "provider_error"
+    elif any(source["status"] == "no_match" for source in sources):
+        fallback_reason = "no_live_match"
+    else:
+        fallback_reason = "providers_not_configured"
+    return {"events": estimated_results, "mode": "estimated", "fallback_reason": fallback_reason, "sources": sources}
 
 
 @app.get("/api/history/{event_key}")

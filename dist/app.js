@@ -105,28 +105,32 @@ function showCatalogResults(query) {
 }
 function showLiveResults(events, query) {
   const priced = events.filter((event) => event.low != null);
-  if (!priced.length) return false;
+  if (!events.length) return false;
   $$('.event-stub').forEach((card) => { card.hidden = true; });
   $$('.live-result').forEach((card) => card.remove());
-  const markup = priced.slice(0, 5).map((event) => {
-    const artist = escapeHTML(event.artist || 'Live event'), city = escapeHTML(event.city || $('#citySelect').value), venue = escapeHTML(event.venue || 'Venue TBA'), date = escapeHTML(event.date || 'Date TBA'), low = Math.round(event.low), liveType = event.price_type === 'live_official' ? 'LIVE OFFICIAL' : 'LIVE RESALE';
-    return `<article class="event-stub live-result" tabindex="0" data-category="Live event" data-artist="${artist}" data-city="${city}" data-venue="${venue}" data-date="${date}" data-low="${low}" data-change="0"><div class="event-date">${date}</div><h3>${artist}</h3><p>${city} · ${venue}</p><div><strong>from $${low}</strong><span class="estimate-badge">${liveType}</span><button class="save-event" aria-label="Save ${artist}">♡</button></div></article>`;
+  const markup = events.slice(0, 5).map((event) => {
+    const artist = escapeHTML(event.artist || 'Live event'), city = escapeHTML(event.city || $('#citySelect').value), venue = escapeHTML(event.venue || 'Venue TBA'), date = escapeHTML(event.date || 'Date TBA'), hasPrice = event.low != null, low = hasPrice ? Math.round(event.low) : '', liveType = event.price_type === 'live_official' ? 'LIVE OFFICIAL' : 'LIVE RESALE', providerURL = event.url ? escapeHTML(event.url) : '';
+    const priceLabel = hasPrice ? `from $${low}` : 'price at provider';
+    const providerLink = providerURL ? `<a class="provider-link" href="${providerURL}" target="_blank" rel="noopener noreferrer">View ↗</a>` : '';
+    return `<article class="event-stub live-result" tabindex="0" data-category="Live event" data-artist="${artist}" data-city="${city}" data-venue="${venue}" data-date="${date}" data-low="${low}" data-has-price="${hasPrice}" data-change="0"><div class="event-date">${date}</div><h3>${artist}</h3><p>${city} · ${venue}</p><div><strong>${priceLabel}</strong><span class="estimate-badge">${liveType}</span>${providerLink}</div></article>`;
   }).join('');
   $('#eventRail').insertAdjacentHTML('afterbegin', markup);
   const summary = $('#searchSummary'); summary.hidden = false;
-  summary.innerHTML = `<div><span class="label">LIVE SEARCH</span><strong>${priced.length} priced result${priced.length === 1 ? '' : 's'} for “${escapeHTML(query)}”</strong><small>Direct provider data · availability can change at checkout</small></div><button type="button" id="clearSearch">Clear</button>`;
+  summary.innerHTML = `<div><span class="label">LIVE SEARCH</span><strong>${events.length} official result${events.length === 1 ? '' : 's'} for “${escapeHTML(query)}”</strong><small>${priced.length ? `${priced.length} with published price ranges` : 'Prices are not published in the discovery feed—check the provider'} · availability can change</small></div><button type="button" id="clearSearch">Clear</button>`;
   $('#clearSearch').onclick = clearSearchResults;
-  setActiveMarket(marketFromCard($('.live-result')));
-  toast(`${priced.length} live priced result${priced.length === 1 ? '' : 's'}`);
+  const firstPriced = $$('.live-result').find((card) => card.dataset.hasPrice === 'true');
+  if (firstPriced) setActiveMarket(marketFromCard(firstPriced));
+  toast(`${events.length} live official result${events.length === 1 ? '' : 's'}`);
   return true;
 }
 function clearSearchResults() { $('#searchSummary').hidden = true; $('#estimatedResult')?.remove(); $$('.live-result').forEach((card) => card.remove()); $$('.event-stub').forEach((card) => { card.hidden = false; }); }
-function showEstimatedResult(query, city) {
+function showEstimatedResult(query, city, reason = 'no_live_match') {
   const artist = resolveQuery(query), corrected = artist.toLowerCase() !== query.trim().toLowerCase(), price = estimatedPrice(artist);
   const safeArtist = escapeHTML(artist), safeQuery = escapeHTML(query.trim()), safeCity = escapeHTML(city);
   const summary = $('#searchSummary');
   summary.hidden = false;
-  summary.innerHTML = `<div><span class="label">SEARCH RESULT</span><strong>${corrected ? `Showing “${safeArtist}” for “${safeQuery}”` : `Showing “${safeArtist}”`}</strong><small>Live inventory unavailable · displaying a market estimate</small></div><button type="button" id="clearSearch">Clear</button>`;
+  const explanations = { provider_error:'A live provider could not be reached', providers_not_configured:'Live providers are not configured', no_live_match:'No current live provider match was found' };
+  summary.innerHTML = `<div><span class="label">ESTIMATED RESULT</span><strong>${corrected ? `Showing “${safeArtist}” for “${safeQuery}”` : `Showing “${safeArtist}”`}</strong><small>${explanations[reason] || explanations.no_live_match} · this is a market estimate, not live inventory</small></div><button type="button" id="clearSearch">Clear</button>`;
   $$('.event-stub').forEach((card) => { card.hidden = true; });
   $('#estimatedResult')?.remove();
   $('#eventRail').insertAdjacentHTML('afterbegin', `<article class="event-stub estimated-result" id="estimatedResult" tabindex="0" role="button" data-category="Concerts" data-artist="${safeArtist}" data-city="${safeCity}" data-venue="Venue TBA" data-date="Date TBA" data-low="${price}" data-change="-5"><div class="event-date">DATE TBA</div><h3>${safeArtist}</h3><p>${safeCity} · venue and date to be confirmed</p><div><strong>estimated from $${price}</strong><span class="estimate-badge">ESTIMATE</span><button class="save-event" aria-label="Save ${safeArtist}">♡</button></div></article>`);
@@ -144,7 +148,7 @@ $('#searchForm').onsubmit = async (event) => {
     if (!response.ok) throw new Error('Static preview');
     const data = await response.json();
     if (data.mode === 'live' && showLiveResults(data.events, query)) return;
-    if (!showCatalogResults(query)) showEstimatedResult(resolveQuery(query), city);
+    showEstimatedResult(data.events?.[0]?.artist || resolveQuery(query), city, data.fallback_reason);
   } catch { if (!showCatalogResults(query)) showEstimatedResult(query, city); }
   $('#discover').scrollIntoView();
 };
@@ -202,8 +206,10 @@ $$('.zone-trigger').forEach((trigger) => { trigger.addEventListener('mouseenter'
 $('#closeZoneDetails').onclick = () => { $('#zone-details').hidden = true; history.replaceState(null,'','#market'); $('.venue-map').scrollIntoView({behavior:'smooth',block:'center'}); };
 
 $('#eventRail').addEventListener('click', (event) => {
-  if (event.target.closest('button')) return;
-  const card = event.target.closest('.event-stub'); if (card) setActiveMarket(marketFromCard(card), true);
+  if (event.target.closest('button, a')) return;
+  const card = event.target.closest('.event-stub');
+  if (card?.dataset.hasPrice === 'false') { toast('This provider has not published a price range yet'); return; }
+  if (card) setActiveMarket(marketFromCard(card), true);
 });
 $('#eventRail').addEventListener('keydown', (event) => {
   if (!['Enter',' '].includes(event.key) || event.target.closest('button')) return;
