@@ -52,20 +52,83 @@ function resolveQuery(value) {
 }
 function estimatedPrice(name) { return 95 + [...name].reduce((total, char) => total + char.charCodeAt(0), 0) % 126; }
 function marketFromCard(card) {
-  return { artist:card.dataset.artist, city:card.dataset.city, venue:card.dataset.venue, date:card.dataset.date, low:+card.dataset.low, change:+card.dataset.change || -5, estimated:card.id === 'estimatedResult' };
+  const low = card.dataset.low === '' ? null : +card.dataset.low;
+  return { slug:card.dataset.slug, artist:card.dataset.artist, city:card.dataset.city, venue:card.dataset.venue, date:card.dataset.date, low, change:+card.dataset.change || -5, live:card.classList.contains('live-result'), estimated:card.dataset.priceType === 'estimated' || card.id === 'estimatedResult' };
 }
 function generatedHistory(low, change) {
   const factor = 1 + Math.abs(change) / 100, steps = [1.12,1.09,1.1,1.06,1.04,1.05,1.02,1];
   const series = (multiple) => steps.map((step) => Math.round(low * multiple * step * factor / factor));
   return { labels:['Oct 12','Oct 16','Oct 20','Oct 24','Oct 28','Nov 1','Nov 5','Today'], low:series(1), median:series(1.28), official:series(1.72), resale:series(1.14) };
 }
+function historyState(kind, title, detail) {
+  const state = $('#historyState');
+  if (!kind) { state.hidden = true; return; }
+  state.hidden = false;
+  state.innerHTML = `<span>${escapeHTML(kind)}</span><strong>${escapeHTML(title)}</strong><small>${escapeHTML(detail)}</small>`;
+}
+function recordedHistory(snapshots) {
+  const labels = snapshots.map((item) => new Date(item.recorded_at).toLocaleDateString('en-CA', { month:'short', day:'numeric' }));
+  const prices = snapshots.map((item) => Number(item.price));
+  return {
+    labels,
+    timestamps:snapshots.map((item) => item.recorded_at),
+    low:prices,
+    median:[],
+    official:snapshots.map((item) => item.price_type === 'live_official' ? Number(item.price) : null),
+    resale:snapshots.map((item) => item.price_type === 'live_resale' ? Number(item.price) : null),
+  };
+}
+async function loadLiveHistory(slug) {
+  historyState('CHECKING NEON', 'Loading recorded prices…', 'SeatScout is looking for observations collected for this exact event.');
+  $('#priceChart').innerHTML = '';
+  try {
+    const apiBase = (window.SEATSCOUT_API_BASE || '').replace(/\/$/, '');
+    const response = await fetch(`${apiBase}/api/history/${encodeURIComponent(slug)}`);
+    if (!response.ok) throw new Error('History request failed');
+    const data = await response.json(), snapshots = data.snapshots || [];
+    if (snapshots.length < 2) {
+      const latest = snapshots.at(-1);
+      window.SEATSCOUT_HISTORY = { labels:[], timestamps:[], low:[], median:[], official:[], resale:[] };
+      historyState('COLLECTING HISTORY', snapshots.length ? 'First price recorded' : 'No recorded price yet', snapshots.length ? 'At least two observations are needed before SeatScout can draw a truthful trend.' : 'The event is live, but its provider has not published a price range for SeatScout to record.');
+      $('#marketChange').textContent = 'Need 2+ points';
+      $('#marketLowest').textContent = latest ? `$${Math.round(latest.price)}` : 'Not recorded';
+      $('#marketSignal').textContent = 'Insufficient data';
+      $$('.chart-legend button').forEach((button) => button.classList.add('unavailable'));
+      return;
+    }
+    window.SEATSCOUT_HISTORY = recordedHistory(snapshots);
+    historyState('', '', '');
+    const prices = snapshots.map((item) => Number(item.price)), first = prices[0], last = prices.at(-1), change = ((last - first) / first) * 100;
+    $('#marketChange').textContent = `${change <= 0 ? '↓' : '↑'} ${Math.abs(change).toFixed(1)}%`;
+    $('#marketLowest').textContent = `$${Math.round(Math.min(...prices))}`;
+    $('#marketSignal').textContent = snapshots.length < 3 ? 'Collecting more data' : change < -6 ? 'Prices trending down' : change > 6 ? 'Prices trending up' : 'Market is steady';
+    $$('.chart-legend button').forEach((button) => {
+      const values = window.SEATSCOUT_HISTORY[button.dataset.series].filter(Number.isFinite);
+      button.classList.toggle('unavailable', !values.length);
+      if (values.length) button.querySelector('b').textContent = `$${Math.round(values.at(-1))}`;
+    });
+    drawChart(+$('.range-tabs .active').dataset.range);
+  } catch {
+    historyState('HISTORY UNAVAILABLE', 'Could not load recorded prices', 'The live event remains available. Try the history panel again after the service reconnects.');
+    $('#marketSignal').textContent = 'History unavailable';
+  }
+}
 function setActiveMarket(eventData, scroll = false) {
-  const { artist, city, venue, date, low, change, estimated } = eventData;
+  const { slug, artist, city, venue, date, low, change, estimated, live } = eventData;
   $$('.event-stub').forEach((card) => card.classList.toggle('active-market', card.dataset.artist === artist));
-  $('#marketModeLabel').textContent = estimated ? 'ESTIMATED MARKET PREVIEW' : 'MARKET BOARD';
+  $('#market').classList.toggle('live-event-mode', live);
+  $('#liveDataNotice').hidden = !live;
+  $('#marketModeLabel').textContent = live ? 'LIVE OFFICIAL EVENT' : 'ESTIMATED MARKET PREVIEW';
   $('#marketEventTitle').textContent = `${artist} — ${city}`;
-  $('#marketEventSubtitle').textContent = estimated ? 'Projected ticket market' : `${artist} ticket market`;
-  $('#marketEventMeta').textContent = `${venue} · ${date}${estimated ? '' : ' · local time TBA'}`;
+  $('#marketEventSubtitle').textContent = live ? 'Official discovery data' : 'Projected ticket market';
+  $('#marketEventMeta').textContent = `${venue} · ${date}`;
+  if (live) {
+    loadLiveHistory(slug);
+    if (scroll) $('#market').scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  historyState('', '', '');
+  $$('.chart-legend button').forEach((button) => button.classList.remove('unavailable'));
   window.SEATSCOUT_HISTORY = generatedHistory(low, change);
   const current = Object.fromEntries(['low','median','official','resale'].map((key) => [key, window.SEATSCOUT_HISTORY[key].at(-1)]));
   $$('.chart-legend button').forEach((button) => { button.querySelector('b').textContent = `$${current[button.dataset.series]}`; });
@@ -112,14 +175,13 @@ function showLiveResults(events, query) {
     const artist = escapeHTML(event.artist || 'Live event'), city = escapeHTML(event.city || $('#citySelect').value), venue = escapeHTML(event.venue || 'Venue TBA'), date = escapeHTML(event.date || 'Date TBA'), hasPrice = event.low != null, low = hasPrice ? Math.round(event.low) : '', liveType = event.price_type === 'live_official' ? 'LIVE OFFICIAL' : 'LIVE RESALE', providerURL = event.url ? escapeHTML(event.url) : '';
     const priceLabel = hasPrice ? `from $${low}` : 'price at provider';
     const providerLink = providerURL ? `<a class="provider-link" href="${providerURL}" target="_blank" rel="noopener noreferrer">View ↗</a>` : '';
-    return `<article class="event-stub live-result" tabindex="0" data-category="Live event" data-artist="${artist}" data-city="${city}" data-venue="${venue}" data-date="${date}" data-low="${low}" data-has-price="${hasPrice}" data-change="0"><div class="event-date">${date}</div><h3>${artist}</h3><p>${city} · ${venue}</p><div><strong>${priceLabel}</strong><span class="estimate-badge">${liveType}</span>${providerLink}</div></article>`;
+    return `<article class="event-stub live-result" tabindex="0" data-category="Live event" data-slug="${escapeHTML(event.slug || '')}" data-price-type="${escapeHTML(event.price_type || '')}" data-artist="${artist}" data-city="${city}" data-venue="${venue}" data-date="${date}" data-low="${low}" data-has-price="${hasPrice}" data-change="0"><div class="event-date">${date}</div><h3>${artist}</h3><p>${city} · ${venue}</p><div><strong>${priceLabel}</strong><span class="estimate-badge">${liveType}</span>${providerLink}</div></article>`;
   }).join('');
   $('#eventRail').insertAdjacentHTML('afterbegin', markup);
   const summary = $('#searchSummary'); summary.hidden = false;
   summary.innerHTML = `<div><span class="label">LIVE SEARCH</span><strong>${events.length} official result${events.length === 1 ? '' : 's'} for “${escapeHTML(query)}”</strong><small>${priced.length ? `${priced.length} with published price ranges` : 'Prices are not published in the discovery feed—check the provider'} · availability can change</small></div><button type="button" id="clearSearch">Clear</button>`;
   $('#clearSearch').onclick = clearSearchResults;
-  const firstPriced = $$('.live-result').find((card) => card.dataset.hasPrice === 'true');
-  if (firstPriced) setActiveMarket(marketFromCard(firstPriced));
+  setActiveMarket(marketFromCard($('.live-result')));
   toast(`${events.length} live official result${events.length === 1 ? '' : 's'}`);
   return true;
 }
@@ -133,7 +195,7 @@ function showEstimatedResult(query, city, reason = 'no_live_match') {
   summary.innerHTML = `<div><span class="label">ESTIMATED RESULT</span><strong>${corrected ? `Showing “${safeArtist}” for “${safeQuery}”` : `Showing “${safeArtist}”`}</strong><small>${explanations[reason] || explanations.no_live_match} · this is a market estimate, not live inventory</small></div><button type="button" id="clearSearch">Clear</button>`;
   $$('.event-stub').forEach((card) => { card.hidden = true; });
   $('#estimatedResult')?.remove();
-  $('#eventRail').insertAdjacentHTML('afterbegin', `<article class="event-stub estimated-result" id="estimatedResult" tabindex="0" role="button" data-category="Concerts" data-artist="${safeArtist}" data-city="${safeCity}" data-venue="Venue TBA" data-date="Date TBA" data-low="${price}" data-change="-5"><div class="event-date">DATE TBA</div><h3>${safeArtist}</h3><p>${safeCity} · venue and date to be confirmed</p><div><strong>estimated from $${price}</strong><span class="estimate-badge">ESTIMATE</span><button class="save-event" aria-label="Save ${safeArtist}">♡</button></div></article>`);
+  $('#eventRail').insertAdjacentHTML('afterbegin', `<article class="event-stub estimated-result" id="estimatedResult" tabindex="0" role="button" data-category="Concerts" data-price-type="estimated" data-artist="${safeArtist}" data-city="${safeCity}" data-venue="Venue TBA" data-date="Date TBA" data-low="${price}" data-change="-5"><div class="event-date">DATE TBA</div><h3>${safeArtist}</h3><p>${safeCity} · venue and date to be confirmed</p><div><strong>estimated from $${price}</strong><span class="estimate-badge">ESTIMATE</span><button class="save-event" aria-label="Save ${safeArtist}">♡</button></div></article>`);
   setActiveMarket(marketFromCard($('#estimatedResult')));
   $('#clearSearch').onclick = clearSearchResults;
   toast(corrected ? `Corrected to ${artist} · estimated result shown` : 'Estimated market result shown');
@@ -159,8 +221,11 @@ function drawChart(range = 30) {
   const svg = $('#priceChart'), data = window.SEATSCOUT_HISTORY;
   if (!svg || !data || !Array.isArray(data.labels)) return;
   const W = 760, H = 260, padding = { l: 48, r: 18, t: 18, b: 34 };
-  const count = range === 7 ? 4 : data.labels.length, start = Math.max(0, data.labels.length - count), labels = data.labels.slice(start);
-  const visibleValues = ['low','median','official','resale'].filter((key) => !hiddenSeries.has(key)).flatMap((key) => data[key].slice(start));
+  const cutoff = Date.now() - range * 86400000;
+  const timestampStart = data.timestamps?.findIndex((value) => new Date(value).getTime() >= cutoff);
+  const count = range === 7 ? 4 : data.labels.length, start = data.timestamps ? Math.max(0, timestampStart) : Math.max(0, data.labels.length - count), labels = data.labels.slice(start);
+  const visibleValues = ['low','median','official','resale'].filter((key) => !hiddenSeries.has(key)).flatMap((key) => (data[key] || []).slice(start)).filter(Number.isFinite);
+  if (!visibleValues.length) { svg.innerHTML = ''; return; }
   const rawMin = Math.min(...visibleValues), rawMax = Math.max(...visibleValues), spread = Math.max(40, rawMax - rawMin), min = Math.max(0, Math.floor((rawMin - spread * .12) / 10) * 10), max = Math.ceil((rawMax + spread * .12) / 10) * 10;
   const x = (index) => padding.l + index * (W - padding.l - padding.r) / Math.max(1, labels.length - 1);
   const y = (value) => padding.t + (max - value) * (H - padding.t - padding.b) / (max - min);
@@ -169,9 +234,11 @@ function drawChart(range = 30) {
   labels.forEach((label, index) => { markup += `<text x="${x(index)}" y="${H-8}" text-anchor="middle" font-size="9" font-family="DM Mono">${label}</text>`; });
   [['low','#e0a82e','4 5'],['median','#6f7645',''],['official','#8f1f25','8 5'],['resale','#67151a','']].forEach(([key,color,dash]) => {
     if (hiddenSeries.has(key)) return;
-    const values = data[key].slice(start), points = values.map((value,index) => `${x(index)},${y(value)}`).join(' ');
+    const indexedValues = (data[key] || []).slice(start).map((value, index) => ({ value, index })).filter(({ value }) => Number.isFinite(value));
+    if (!indexedValues.length) return;
+    const points = indexedValues.map(({ value,index }) => `${x(index)},${y(value)}`).join(' ');
     markup += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="${dash}" stroke-linecap="round" stroke-linejoin="round"/>`;
-    values.forEach((value,index) => { markup += `<circle class="chart-point" tabindex="0" data-label="${labels[index]}" data-series="${key}" data-value="${value}" cx="${x(index)}" cy="${y(value)}" r="6" fill="${color}" stroke="#fff8e9" stroke-width="3"/>`; });
+    indexedValues.forEach(({ value,index }) => { markup += `<circle class="chart-point" tabindex="0" data-label="${labels[index]}" data-series="${key}" data-value="${value}" cx="${x(index)}" cy="${y(value)}" r="6" fill="${color}" stroke="#fff8e9" stroke-width="3"/>`; });
   });
   svg.innerHTML = markup;
   $$('.chart-point').forEach((point) => {

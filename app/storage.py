@@ -58,7 +58,7 @@ def save_event_snapshots(events: list[dict]) -> int:
     return len(rows)
 
 
-def get_price_history(event_key: str, limit: int = 720) -> list[dict]:
+def get_price_history(event_key: str, limit: int = 5000) -> list[dict]:
     query = (
         select(price_snapshots)
         .where(price_snapshots.c.event_key == event_key.lower())
