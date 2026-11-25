@@ -60,12 +60,16 @@ class TicketmasterProvider:
         events = response.json().get("_embedded", {}).get("events", [])
         return [{
             "slug": event["id"],
+            "provider_event_id": event["id"],
             "artist": event["name"],
             "city": event.get("_embedded", {}).get("venues", [{}])[0].get("city", {}).get("name", ""),
             "date": event.get("dates", {}).get("start", {}).get("localDate", ""),
+            "local_time": (event.get("dates", {}).get("start", {}).get("localTime") or "")[:5] if not event.get("dates", {}).get("start", {}).get("timeTBA") else "",
             "venue": event.get("_embedded", {}).get("venues", [{}])[0].get("name", ""),
             "category": "Live event",
             "low": min((price.get("min") for price in event.get("priceRanges", []) if price.get("min") is not None), default=None),
+            "currency": next((price.get("currency") for price in event.get("priceRanges", []) if price.get("currency")), None),
+            "fees_included": "unknown",
             "change": None,
             "url": event.get("url"),
             "source": "Ticketmaster",
@@ -87,12 +91,16 @@ class SeatGeekProvider:
             response.raise_for_status()
         return [{
             "slug": f"sg-{event['id']}",
+            "provider_event_id": str(event["id"]),
             "artist": event["title"],
             "city": event.get("venue", {}).get("city", ""),
             "date": event.get("datetime_local", "")[:10],
+            "local_time": event.get("datetime_local", "")[11:16] if not event.get("time_tbd") else "",
             "venue": event.get("venue", {}).get("name", ""),
             "category": event.get("type", "Live event").replace("_", " ").title(),
             "low": event.get("stats", {}).get("lowest_price"),
+            "currency": None,
+            "fees_included": "unknown",
             "change": None,
             "url": event.get("url"),
             "source": "SeatGeek",

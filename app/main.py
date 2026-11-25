@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
 from .data import EVENTS, OFFERS, PRICE_HISTORY, ZONES
+from .normalization import group_comparisons
 from .providers import DemoProvider, SeatGeekProvider, TicketmasterProvider, provider_statuses
 from .storage import get_price_history, init_db, save_event_snapshots
 
@@ -75,7 +76,7 @@ async def search(q: str = Query("", max_length=120), city: str | None = None):
             sources.append({"name": provider.name, "status": "error", "count": 0})
     if live_results:
         save_event_snapshots(live_results)
-        return {"events": live_results, "mode": "live", "sources": sources}
+        return {"events": live_results, "comparisons": group_comparisons(live_results), "mode": "live", "sources": sources}
     estimated_results = [{**event, "source": "SeatScout estimate", "price_type": "estimated"} for event in results]
     if any(source["status"] == "error" for source in sources):
         fallback_reason = "provider_error"
